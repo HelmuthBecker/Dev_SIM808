@@ -3,18 +3,23 @@
 
 SoftwareSerial sim808(8,9); //Rx-Tx
 
-String response;                                      //Contém a informação bruta, enviada pelo módulo GPS, após o comando AT.
+String response;                                      //Contém a informação enviada pelo módulo GPS, após o comando AT.
 int tamanhoString;                                    //Informa a qtd de char da variável response; Acima de 110 char, indica que os dados fornecidos pelo GPS são utilizaveis.
-String data[5];                                       //Vetor de string que, após separados os dados relevantes existentes na variável response, 
+String data[7];                                       //Vetor de string que, após separados os dados relevantes existentes na variável response, 
                                                       //irá armazenar os valores referentes a Lat, Long, Time e status separadamente.
         
 void setup()
 {
   Serial.begin(9600);
   sim808.begin(9600);
- delay (2000);
-   getgps();                                          //Função com comandos para iniciar o GPS.
-   Serial.println("Iniciando GPS...");
+  delay (2000);
+  
+  
+   while (response.length() != 21){                     //Se mantém em loop aguardando pela resposta de confirmação do comando para prosseguir
+    Serial.println("Iniciando GPS...");
+    getgps();                                          //Função com comandos para iniciar o GPS.
+    delay (3000);
+    }  
 }
 
 void loop()
@@ -23,21 +28,19 @@ void loop()
         criarMensagem();                              //Faz o tratamento da string recebida pelo módulo com todos dados fornecidos
         if (data[1] != 0){                            //Se o status enviado pelo GPS for diferente de 0, indica que os dados recebidos estão OK
           while (data[1] != 0){                       //Enquanto o status for diferente de 0, permanece no loop
-        sendData( "AT+CGNSINF",1000,DEBUG);  
-        delay(1000);
-        criarMensagem();
+            sendData( "AT+CGNSINF",1000,DEBUG);  
+            delay(1000);
+            criarMensagem();
           }
         }
         else {                                      //Caso o módulo perca o sinal com o GPS, tenta reconectar
-              Serial.println("Aguardando Sinal GPS...");
-              while (data[1] == 0){
-              delay(5000);
-              getgps();
-              }
-             } 
-   }
+                getgps();
+                Serial.println("Aguardando Sinal GPS...");
+                delay(5000);
+             }
+} 
    
-void criarMensagem (){                              //Função que faz o tratamento da string com os dados do GPS
+void criarMensagem (){                              //Função que faz o tratamento da string com os dados do GPS, e gera a mensagem exibida pela serial
       
       int i = 0;                                    //contador da string data
       tamanhoString = response.length();            //Informa a qtd de char da variável response; Acima de 110 char, indica que os dados fornecidos pelo GPS são utilizaveis.
@@ -48,24 +51,25 @@ void criarMensagem (){                              //Função que faz o tratame
           char h = response[a];                     //char h, variavel que armazena o valor da string response byte a byte
       if (h != ',') {                               //enquanto h for diferente de "," preenche a string
          data[i] +=h;
-         h = "";                                    //esvazia a string para o próximo loop
+         h = "";                                    //esvazia a variavel para o próximo loop
          delay(100);
       } else {                                      //caso h seja igual "," incrementa o contador i o que faz criar uma nova string para armazenar dados da variavel response
         i++;  
       }
-      if (i == 5) {                                 //quando o contador i chega a 5, todas variáveis com os dados relevantes do GPS estão criadas.
-        
-        Serial.println("Status: "+data[1]);
-        Serial.println("Time: "+data[2]);
-        Serial.println("Latitude: "+data[3]);
-        Serial.println("Longitude: "+data[4]);
+      if (i == 7) {                                 //quando o contador i chega a 5, todas variáveis com os dados relevantes do GPS estão criadas.
+
+        Serial.println("Status:     "+data[1]);
+        Serial.println("Time:       "+data[2]);
+        Serial.println("Latitude:   "+data[3]);
+        Serial.println("Longitude:  "+data[4]);
+        Serial.println("Velocidade: "+data[6]+" Nós");
         break;
           }
         }
     }    
   }
   
-void getgps(void)                                   //Função que ativa o GPS
+void getgps (void)                                   //Função que ativa o GPS
 {
    sendData( "AT+CGNSPWR=1",1000,DEBUG);            //Liga o GPS em modo GNSS
    Serial.println(response); 
@@ -76,12 +80,17 @@ void getgps(void)                                   //Função que ativa o GPS
 
 String sendData(String command, const int timeout, boolean debug)
 {
+    //Efetua a limpeza das variáveis antes de executar a função
     data[0]="";                                     //Informações irrelevantes
     data[1]="";                                     //Status do GPS
     data[2]="";                                     //Time
     data[3]="";                                     //Latitude
     data[4]="";                                     //Longitude
+    data[5]="";                                     //Informações irrelevantes
+    data[6]="";                                     //Velocidade Nós
+    data[7]="";                                     //Informações irrelevantes
     response = "";                                  //Informações completas do módulo GPS
+    
     sim808.println(command); 
     long int time = millis();   
     while( (time+timeout) > millis())               //Enquanto a soma de time(millis()) + timeout for maior do que o valor atual de millis(), lê caracteres da Serial.
